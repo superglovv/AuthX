@@ -15,9 +15,17 @@ app.permanent_session_lifetime = timedelta(minutes=15)
 
 app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
-    SESSION_COOKIE_SECURE=False,
+    SESSION_COOKIE_SECURE=True,
     SESSION_COOKIE_SAMESITE='Strict',
 )
+
+@app.after_request
+def add_security_headers(response):
+    response.headers['Content-Security-Policy'] = "default-src 'self'; style-src 'self' 'unsafe-inline'"
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['Referrer-Policy'] = 'no-referrer'
+    return response
 
 CSS_STYLE = '''
 <style>
@@ -245,22 +253,16 @@ def tickets():
     user_id = session['user_id']
     role = session['role']
     
-    # Preluare filtre
     status = request.form.get('status') or request.args.get('status', '')
     severity = request.form.get('severity') or request.args.get('severity', '')
     search = request.form.get('search') or request.args.get('search', '')
     
-    # Start Query
     query = "SELECT * FROM tickets WHERE 1=1"
     params = []
 
-    # --- FIXUL DE SECURITATE (Broken Access Control Prevention) ---
-    # Dacă utilizatorul este 'ANALYST', limităm vizibilitatea strict la tichetele sale.
-    # Dacă este 'MANAGER', el poate vedea totul (nu adăugăm filtrarea pe owner_id).
     if role == 'ANALYST':
         query += " AND owner_id = ?"
         params.append(user_id)
-    # -------------------------------------------------------------
 
     if status:
         query += " AND status = ?"
@@ -274,7 +276,6 @@ def tickets():
         
     results = db.execute(query, params).fetchall()
     
-    # Generare rânduri tabel
     rows = "".join([f"<tr><td>{t['id']}</td><td>{t['title']}</td><td>{t['status']}</td><td>{t['severity']}</td><td><a href='/edit_ticket/{t['id']}'>Edit</a></td></tr>" for t in results])
     
     return render_template_string(CSS_STYLE + f'''
@@ -465,4 +466,4 @@ def logout():
     return redirect(url_for('index'))
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    app.run(debug=False, port=5000)

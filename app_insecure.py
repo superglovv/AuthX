@@ -1,9 +1,7 @@
 from flask import Flask, request, render_template_string, session, redirect, url_for
 import sqlite3
 import hashlib
-import secrets
 from datetime import datetime, timedelta
-import re
 import random
 
 app = Flask(__name__)
@@ -123,16 +121,12 @@ def tickets():
     if 'user_id' not in session: return redirect(url_for('index'))
     db = get_db()
     
-    # Preluare filtre din formular (POST) sau URL (GET)
     status = request.form.get('status') or request.args.get('status', '')
     severity = request.form.get('severity') or request.args.get('severity', '')
     search = request.form.get('search') or request.args.get('search', '')
     
     query = "SELECT * FROM tickets WHERE 1=1"
     params = []
-
-    # VULNERABILITATE: În versiunea insecure, "uităm" să filtrăm după owner_id 
-    # pentru ca Analyst-ul să poată vedea tot (Broken Access Control)
     
     if status:
         query += " AND status = ?"
@@ -267,22 +261,19 @@ def reset_password(token):
     if request.method == 'POST':
         new_password = request.form.get('password')
         
-        if len(new_password) < 8:
-            error_message = "Parola trebuie să aibă minim 8 caractere!"
-        else:
-            hashed = hashlib.md5(new_password.encode('utf-8')).hexdigest()
-            db.execute("UPDATE users SET password_hash = ? WHERE id = ?", 
-                       (hashed, user['id']))
-            db.commit()
-            log_action(user['id'], 'PASSWORD_RESET_SUCCESS', 'auth')
+        hashed = hashlib.md5(new_password.encode('utf-8')).hexdigest()
+        db.execute("UPDATE users SET password_hash = ? WHERE id = ?", 
+                    (hashed, user['id']))
+        db.commit()
+        log_action(user['id'], 'PASSWORD_RESET_SUCCESS', 'auth')
             
-            return render_template_string(CSS_STYLE + '''
-            <div class="card">
-                <h2>Succes</h2>
-                <p>Parola a fost resetată cu succes!</p>
-                <a href="/" class="btn-link">Mergi la Login</a>
-            </div>
-            ''')
+        return render_template_string(CSS_STYLE + '''
+        <div class="card">
+            <h2>Succes</h2>
+            <p>Parola a fost resetată cu succes!</p>
+            <a href="/" class="btn-link">Mergi la Login</a>
+        </div>
+        ''')
 
     return render_template_string(CSS_STYLE + f'''
     <div class="card">
